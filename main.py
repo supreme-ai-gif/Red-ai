@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, send_file
+from flask_cors import CORS  # <-- import CORS
 import os, io, json, numpy as np
 from core import GeneticCore
 from learning import Updater
@@ -12,6 +13,7 @@ OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
 openai.api_key = OPENAI_API_KEY
 
 app = Flask(__name__)
+CORS(app)  # <-- enables CORS for all routes
 
 core = GeneticCore(voice=None)  # voice handled separately
 updater = Updater(core=core, voice=None)
