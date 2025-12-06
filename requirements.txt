@@ -1,0 +1,6 @@
+flask
+flask-cors
+gtts
+openai
+numpy
+soundfile
