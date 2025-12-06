@@ -9,7 +9,7 @@ import tempfile
 import openai
 
 # ===== CONFIG =====
-OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
+OPENAI_API_KEY = "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"
 openai.api_key = OPENAI_API_KEY
 
 app = Flask(__name__)
