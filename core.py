@@ -35,6 +35,7 @@ RESPONSES = [
 class GeneticCore:
     def __init__(self, voice):
         self.voice = voice
+        self.weight = 1.0
         self.memory = self._load_memory()
         self._ensure_files()
         self.weights = self._load_weights()
@@ -295,5 +296,6 @@ class GeneticCore:
 
         # mutate weights slightly (evolution)
         self._mutate_weights(strength=0.07)
+        self.memory["last_speech"] = bot_text
 
         self.save_all()
