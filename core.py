@@ -226,7 +226,7 @@ class GeneticCore:
             self.memory["settings"]["mode"] = mode
             self.speak(f"Mode set to {mode}.", proactive=False)
             self._save_memory()
-            return
+        return
     if cmd in ("mute","pause"):
         self.memory["settings"]["muted"] = True
         self.speak("I am muted until you ask me to speak again.", proactive=False)
