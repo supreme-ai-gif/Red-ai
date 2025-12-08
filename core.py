@@ -9,7 +9,7 @@ DEFAULT_MEMORY = {
     "user_name": "",
     "learned_facts": {},
     "response_fitness": {},
-    "weights": {},            
+    "weight": {},            
     "meta": {"created_at": None},
     "settings": {
         "mode": "passive",   
@@ -39,7 +39,7 @@ class GeneticCore:
         self.voice = voice
         self.memory = self._load_memory()
         self._ensure_files()
-        self.weights = self._load_weights()
+        self.weight = self._load_weight()
         self.response_count = []
 
         # init fitness for every response
@@ -63,7 +63,7 @@ class GeneticCore:
 
 
 # ========================= WEIGHTS ==============================
-    def _init_weights(self):
+    def _init_weight(self):
         return {
             "W1": np.random.randn(2,12).tolist(),
             "b1": np.random.randn(12).tolist(),
@@ -72,11 +72,11 @@ class GeneticCore:
         }
 
 
-    def _load_weights(self):
+    def _load_weight(self):
         loaded = None
         try:
-            if "weights" in self.memory:
-                loaded = {k: np.array(v) for k,v in self.memory["weights"].items()}
+            if "weight" in self.memory:
+                loaded = {k: np.array(v) for k,v in self.meweightweight"].items()}
         except:
             loaded=None
 
@@ -84,14 +84,14 @@ class GeneticCore:
         if loaded and all(isinstance(v,np.ndarray) for v in loaded.values()):
             return loaded
 
-        brain = self._init_weights()
-        self.memory["weights"] = brain
+        brain = self._init_weight()
+        self.memory["weight"] = brain
         self._save_memory()
         return {k:np.array(v) for k,v in brain.items()}
 
 
     def _save_memory(self):
-        self.memory["weights"] = {k:v.tolist() for k,v in self.weights.items()}
+        self.memory["weight"] = {k:v.tolist() for k,v in self.weight.items()}
         json.dump(self.memory,open(MEMORY_FILE,"w"),indent=2)
 
 
@@ -260,16 +260,16 @@ class GeneticCore:
 
         # mutation
         reward=len(user)/50
-        for k in self.weights:
-            self.weights[k]+=np.random.normal(0,0.02,self.weights[k].shape)*reward
-            self.weights[k]/=np.linalg.norm(self.weights[k]) or 1
+        for k in self.weight:
+            self.weight[k]+=np.random.normal(0,0.02,self.weight[k].shape)*reward
+            self.weight[k]/=np.linalg.norm(self.weight[k]) or 1
 
         self._save_memory()
 
 
 # =================================================================
     def _neural_forward(self,x):
-        W1,b1=self.weights["W1"],self.weights["b1"]
-        W2,b2=self.weights["W2"],self.weights["b2"]
+        W1,b1=self.weight["W1"],self.weight["b1"]
+        W2,b2=self.weight["W2"],self.weight["b2"]
         h=np.tanh(x@W1+b1)
         return h@W2+b2
