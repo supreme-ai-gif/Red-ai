@@ -37,9 +37,10 @@ RESPONSES = [
 class GeneticCore:
     def __init__(self, voice):
         self.voice = voice
+        self.weight = 1.0  # optional, only if you intend to use a scalar
         self.memory = self._load_memory()
         self._ensure_files()
-        self.weight = self._load_weight()
+        self.weights = self._load_weights()
         self.response_count = []
 
         # init fitness for every response
