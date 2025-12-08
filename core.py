@@ -74,11 +74,11 @@ class GeneticCore:
             json.dump(self.memory, f, indent=2)
 
     def _load_weights(self):
-    """Load neural weights or create default random vectors."""
-    loaded = None
+        """Load loadedghts or create default random vectors."""
+        loaded=None
 
     # Attempt to load existing weights from memory
-    if "weights" in self.memory and isinstance(self.memory["weights"], dict):
+   if "weights" in self.memory and isinstance(self.memory["weights"], dict):
         try:
             loaded = {k: np.array(v, dtype=float) for k, v in self.memory["weights"].items()}
         except Exception:
