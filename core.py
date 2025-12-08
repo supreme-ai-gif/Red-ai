@@ -78,29 +78,29 @@ class GeneticCore:
         loaded=None
 
     # Attempt to load existing weights from memory
-   if "weights" in self.memory and isinstance(self.memory["weights"], dict):
-        try:
-            loaded = {k: np.array(v, dtype=float) for k, v in self.memory["weights"].items()}
+        if "weights" in self.memory and isinstance(self.memory["weights"], dict):
+            try:
+                loaded = {k: np.array(v, dtype=float) for k, v in self.memory["weights"].items()}
         except Exception:
             print("⚠ Weight load failed → resetting")
             loaded = None
 
     # Basic corruption guard: make sure all values are numpy arrays
-    if loaded and all(isinstance(v, np.ndarray) for v in loaded.values()):
-        return loaded
+        if loaded and all(isinstance(v, np.ndarray) for v in loaded.values()):
+            return loaded
 
     # If loading failed or missing, initialize a new brain
-    w = {
-        "reasoning": np.random.rand(16),   # thought patterns
-        "emotion": np.random.rand(16),     # friendliness/curiosity
-        "expression": np.random.rand(16)   # wording + speech
-    }
+        w = {
+             "reasoning": np.random.rand(16),   # thought patterns
+             "emotion": np.random.rand(16),     # friendliness/curiosity
+             "expression": np.random.rand(16)   # wording + speech
+      }
 
-    self.memory["weights"] = w
-    self._save_memory()
+       self.memory["weights"] = w
+       return_save_memory()
 
     # Convert to numpy arrays for internal use
-    return {k: np.array(v) for k, v in w.items()}2      
+       return {k: np.array(v) for k, v in w.items()}2      
 
     # --- utility: is it quiet hours?
     def _in_quiet_hours(self):
