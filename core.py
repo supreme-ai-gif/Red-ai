@@ -218,17 +218,15 @@ class GeneticCore:
 
         text = user  # for evolution calculations
 
-            # --- control commands without using return ---
-cmd = user.lower().strip()
-
-if cmd.startswith("set mode "):
-    mode = cmd.split("set mode ", 1)[1].strip()
-    if mode in ("passive", "proactive", "restricted"):
-        self.memory["settings"]["mode"] = mode
-        self.speak(f"Mode set to {mode}.", proactive=False)
-        self._save_memory()
-else:
-    if cmd in ("mute", "pause"):
+                # --- control commands ---
+    cmd = user.lower().strip()
+    if cmd.startswith("set mode "):
+        mode = cmd.split("set mode ", 1)[1].strip()
+        if mode in ("passive", "proactive", "restricted"):
+            self.memory["settings"]["mode"] = mode
+            self.speak(f"Mode set to {mode}.", proactive=False)
+            self._save_memory()
+    elif cmd in ("mute", "pause"):
         self.memory["settings"]["muted"] = True
         self.speak("I am muted until you ask me to speak again.", proactive=False)
         self._save_memory()
@@ -236,6 +234,10 @@ else:
         self.memory["settings"]["muted"] = False
         self.speak("I am unmuted.", proactive=False)
         self._save_memory()
+    else:
+        # --- continue with fact extraction, history, and neural processing ---
+        pass
+
     
         
 
