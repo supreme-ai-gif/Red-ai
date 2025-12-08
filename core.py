@@ -262,28 +262,36 @@ else:
     # put here the rest of your AI processing logic
     pass
 
-    # --- direct fact query
-    for fk, fv in self.memory["learned_facts"].items():
-        if fk in user.lower():
-            out = f"{fk} is {fv}" if fv is not True else f"I remember that {fk}."
-            self.speak(out)
-            # reward factual response slot
-            self.memory["response_fitness"]["4"] = self.memory["response_fitness"].get("4",1.0) + 0.1
-            self._log_conv(user, out, 4)
-            self._save_memory()
-            return
-
-    # --- history reuse
-    best_entry, score = self._find_similar_history(user)
-    if best_entry:
-        prev = best_entry.get("bot","")
-        self.speak(f"As I said before: {prev}")
-        idx = best_entry.get("response_index")
-        if idx is not None:
-            self.memory["response_fitness"][str(idx)] = self.memory["response_fitness"].get(str(idx),1.0) + 0.05
-        self._log_conv(user, "reused:"+prev, idx)
+    # --- direct fact query without return ---
+matched_fact = False
+for fk, fv in self.memory["learned_facts"].items():
+    if fk in user.lower():
+        out = f"{fk} is {fv}" if fv is not True else f"I remember that {fk}."
+        self.speak(out)
+        # reward factual response slot
+        self.memory["response_fitness"]["4"] = self.memory["response_fitness"].get("4", 1.0) + 0.1
+        self._log_conv(user, out, 4)
         self._save_memory()
-        return
+        matched_fact = True
+        break  # stop after the first match
+
+if not matched_fact:
+    # --- continue processing normally if no fact matches ---
+    pass
+
+    # --- history reuse without return ---
+best_entry, score = self._find_similar_history(user)
+if best_entry:
+    prev = best_entry.get("bot", "")
+    self.speak(f"As I said before: {prev}")
+    idx = best_entry.get("response_index")
+    if idx is not None:
+        self.memory["response_fitness"][str(idx)] = self.memory["response_fitness"].get(str(idx), 1.0) + 0.05
+    self._log_conv(user, "reused:" + prev, idx)
+    self._save_memory()
+else:
+    # --- continue normal AI processing if no similar history found ---
+    pass
 
     # --- Neural decision
     x = np.array([len(user), len(re.findall(r'\w+', user))], dtype=float)
