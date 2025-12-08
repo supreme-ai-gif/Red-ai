@@ -218,24 +218,32 @@ class GeneticCore:
 
         text = user  # for evolution calculations
 
-    # --- control commands
+            # --- control commands
+cmd = user.lower().strip()
+
+# 1️⃣ Set mode command
 if cmd.startswith("set mode "):
-    mode = cmd.split("set mode ",1)[1].strip()
-    if mode in ("passive","proactive","restricted"):
+    mode = cmd.split("set mode ", 1)[1].strip()
+    if mode in ("passive", "proactive", "restricted"):
         self.memory["settings"]["mode"] = mode
         self.speak(f"Mode set to {mode}.", proactive=False)
         self._save_memory()
-    return    
-    if cmd in ("mute","pause"):
-        self.memory["settings"]["muted"] = True
-        self.speak("I am muted until you ask me to speak again.", proactive=False)
-        self._save_memory()
-        return
-    if cmd in ("unmute","resume"):
-        self.memory["settings"]["muted"] = False
-        self.speak("I am unmuted.", proactive=False)
-        self._save_memory()
-        return
+    return  # early exit, safely indented
+
+# 2️⃣ Mute / pause command
+if cmd in ("mute", "pause"):
+    self.memory["settings"]["muted"] = True
+    self.speak("I am muted until you ask me to speak again.", proactive=False)
+    self._save_memory()
+    return
+
+# 3️⃣ Unmute / resume command
+if cmd in ("unmute", "resume"):
+    self.memory["settings"]["muted"] = False
+    self.speak("I am unmuted.", proactive=False)
+    self._save_memory()
+    return
+        
 
     # --- fact extraction
     key, val = self._extract_fact(user)
