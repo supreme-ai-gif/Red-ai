@@ -1,4 +1,4 @@
-# core.py
+indreturneturnre.py
 import os, json, time, re
 import numpy as np
 
@@ -66,35 +66,41 @@ class GeneticCore:
             "b2": np.random.randn(len(RESPONSES)).tolist()
         }
 
+    
+    def _save_memory(self):
+        """Save memory and weights to file."""
+        self.memory["weights"] = {k: v.tolist() for k, v in self.weights.items()}
+        with open(MEMORY_FILE, "w") as f:
+            json.dump(self.memory, f, indent=2)
+
     def _load_weights(self):
-        """Load neural weights or create default random vectors."""
-        if "weights" in self.memory and isinstance(self.memory["weights"], dict):
-            
-            try: 
-                loaded = {k: np.array(v, dtype=float) for k,v in self.memory["weights"].items()}
+    """Load neural weights or create default random vectors."""
+    loaded = None
 
-            # Basic corruption guard
-            if all(isinstance(v, np.ndarray) for v in loaded.values()):
-                return loaded
-
-        except:
+    # Attempt to load existing weights from memory
+    if "weights" in self.memory and isinstance(self.memory["weights"], dict):
+        try:
+            loaded = {k: np.array(v, dtype=float) for k, v in self.memory["weights"].items()}
+        except Exception:
             print("⚠ Weight load failed → resetting")
+            loaded = None
 
-    # Default new brain
-    return {
+    # Basic corruption guard: make sure all values are numpy arrays
+    if loaded and all(isinstance(v, np.ndarray) for v in loaded.values()):
+        return loaded
+
+    # If loading failed or missing, initialize a new brain
+    w = {
         "reasoning": np.random.rand(16),   # thought patterns
         "emotion": np.random.rand(16),     # friendliness/curiosity
-        "expression": np.random.rand(16),  # wording + speech
+        "expression": np.random.rand(16)   # wording + speech
     }
 
+    self.memory["weights"] = w
+    self._save_memory()
 
-def _save_memory(self):
-    """Write current memory + weights to data.json safely."""
-    safe_weights = {k: v.tolist() for k,v in self.weights.items()}
-    self.memory["weights"] = safe_weights
-
-    with open("data.json","w") as f:
-        json.dump(self.memory, f, indreturn
+    # Convert to numpy arrays for internal use
+    return {k: np.array(v) for k, v in w.items()}2      
 
     # --- utility: is it quiet hours?
     def _in_quiet_hours(self):
