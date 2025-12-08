@@ -73,7 +73,7 @@ class GeneticCore:
         with open(MEMORY_FILE, "w") as f:
             json.dump(self.memory, f, indent=2)
 
-     def _load_weights(self):
+    def _load_weights(self):
          """Load neural weights or create default random vectors."""
          loaded = None
 
