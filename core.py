@@ -81,9 +81,9 @@ class GeneticCore:
          if "weights" in self.memory and isinstance(self.memory["weights"], dict):
              try:
                  loaded = {k: np.array(v, dtype=float) for k, v in self.memory["weights"].items()}
-         except Exception:
-             print("⚠ Weight load failed → resetting")
-             loaded = None
+             except Exception:
+                 print("⚠ Weight load failed → resetting")
+                 loaded = None
 
     # Basic corruption guard: make sure all values are numpy arrays
          if loaded and all(isinstance(v, np.ndarray) for v in loaded.values()):
