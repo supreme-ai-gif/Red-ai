@@ -68,10 +68,10 @@ class GeneticCore:
 
     def _load_weights(self):
     """Load neural weights or create default random vectors."""
-    if "weights" in self.memory and isinstance(self.memory["weights"], dict):
-
-        try:
-            loaded = {k: np.array(v, dtype=float) for k,v in self.memory["weights"].items()}
+        if "weights" in self.memory and isinstance(self.memory["weights"], dict):
+            
+            try: 
+                loaded = {k: np.array(v, dtype=float) for k,v in self.memory["weights"].items()}
 
             # Basic corruption guard
             if all(isinstance(v, np.ndarray) for v in loaded.values()):
