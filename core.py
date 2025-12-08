@@ -212,11 +212,11 @@ class GeneticCore:
         return None, None
     # process_input
     def process_input(self, user_input):
-    user = user_input.strip()
-    if not user:
-        return
+        user = user_input.strip()
+        if not user:
+            return
 
-    text = user  # for evolution calculations
+        text = user  # for evolution calculations
 
     # --- control commands
     cmd = user.lower().strip()
