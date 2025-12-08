@@ -73,34 +73,29 @@ class GeneticCore:
         with open(MEMORY_FILE, "w") as f:
             json.dump(self.memory, f, indent=2)
 
-    def _load_weights(self):
-        """Load loadedghts or create default random vectors."""
-        loaded=None
+     def _load_weights(self):
+         """Load neural weights or create default random vectors."""
+         loaded = None
 
     # Attempt to load existing weights from memory
-        if "weights" in self.memory and isinstance(self.memory["weights"], dict):
-            try:
-                loaded = {k: np.array(v, dtype=float) for k, v in self.memory["weights"].items()}
-        except Exception:
-            print("⚠ Weight load failed → resetting")
-            loaded = None
+         if "weights" in self.memory and isinstance(self.memory["weights"], dict):
+             try:
+                 loaded = {k: np.array(v, dtype=float) for k, v in self.memory["weights"].items()}
+         except Exception:
+             print("⚠ Weight load failed → resetting")
+             loaded = None
 
     # Basic corruption guard: make sure all values are numpy arrays
-        if loaded and all(isinstance(v, np.ndarray) for v in loaded.values()):
-            return loaded
+         if loaded and all(isinstance(v, np.ndarray) for v in loaded.values()):
+             return loaded
 
     # If loading failed or missing, initialize a new brain
-        w = {
-             "reasoning": np.random.rand(16),   # thought patterns
-             "emotion": np.random.rand(16),     # friendliness/curiosity
-             "expression": np.random.rand(16)   # wording + speech
-      }
-
-       self.memory["weights"] = w
-       return_save_memory()
+         w = self._init_weights()
+         self.memory["weights"] = w
+         self._save_memory()
 
     # Convert to numpy arrays for internal use
-       return {k: np.array(v) for k, v in w.items()}2      
+         return {k: np.array(v) for k, v in w.items()} 
 
     # --- utility: is it quiet hours?
     def _in_quiet_hours(self):
