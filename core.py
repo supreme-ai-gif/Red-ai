@@ -239,25 +239,28 @@ else:
     
         
 
-    # --- fact extraction
-    key, val = self._extract_fact(user)
-    if key:
-        if key == "user_identity":
-            self.memory["user_name"] = val
-            self.memory["learned_facts"]["user_name"] = val
-            out = f"Nice to meet you, {val}. I will remember that."
-            self.speak(out)
-            self._log_conv(user, out, None)
-            self._save_memory()
-            return
+    # --- fact extraction without return ---
+key, val = self._extract_fact(user)
+if key:
+    if key == "user_identity":
+        self.memory["user_name"] = val
+        self.memory["learned_facts"]["user_name"] = val
+        out = f"Nice to meet you, {val}. I will remember that."
+        self.speak(out)
+        self._log_conv(user, out, None)
+        self._save_memory()
+    else:
         self.memory["learned_facts"][key] = val
         out = f"Okay, I will remember that {key} is {val}" if val is not True else f"Okay, I will remember: {key}"
         self.speak(out)
         # reward learning response (index 5)
-        self.memory["response_fitness"]["5"] = self.memory["response_fitness"].get("5",1.0) + 0.1
+        self.memory["response_fitness"]["5"] = self.memory["response_fitness"].get("5", 1.0) + 0.1
         self._log_conv(user, out, 5)
         self._save_memory()
-        return
+else:
+    # --- continue processing normally if no fact extracted ---
+    # put here the rest of your AI processing logic
+    pass
 
     # --- direct fact query
     for fk, fv in self.memory["learned_facts"].items():
