@@ -67,7 +67,7 @@ class GeneticCore:
         }
 
     def _load_weights(self):
-    """Load neural weights or create default random vectors."""
+        """Load neural weights or create default random vectors."""
         if "weights" in self.memory and isinstance(self.memory["weights"], dict):
             
             try: 
