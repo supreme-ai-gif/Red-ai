@@ -76,7 +76,7 @@ class GeneticCore:
         loaded = None
         try:
             if "weight" in self.memory:
-                loaded = {k: np.array(v) for k,v in self.meweightweight"].items()}
+                loaded = {k: np.array(v) for k,v in self.memory["weight"].items()}
         except:
             loaded=None
 
