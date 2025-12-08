@@ -40,7 +40,7 @@ class GeneticCore:
         self.weight = 1.0  # optional, only if you intend to use a scalar
         self.memory = self._load_memory()
         self._ensure_files()
-        self.weights = self._load_weights()
+        self.weight = self._load_weight()
         self.response_count = []
 
         # init fitness for every response
