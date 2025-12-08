@@ -67,21 +67,34 @@ class GeneticCore:
         }
 
     def _load_weights(self):
-        w = self.memory.get("weights")
-        if not w:
-            w = self._init_weights()
-            self.memory["weights"] = w
-            self._save_memory()
-        # convert to numpy
-        return {k: np.array(v) for k, v in w.items()}
+    """Load neural weights or create default random vectors."""
+    if "weights" in self.memory and isinstance(self.memory["weights"], dict):
 
-    def _save_memory(self):
-        self.memory["weights"] = {k: v.tolist() for k, v in self.weights.items()}
-        with open(MEMORY_FILE, "w") as f:
-            json.dump(self.memory, f, indent=2)
+        try:
+            loaded = {k: np.array(v, dtype=float) for k,v in self.memory["weights"].items()}
 
-    def save_all(self):
-        self._save_memory()
+            # Basic corruption guard
+            if all(isinstance(v, np.ndarray) for v in loaded.values()):
+                return loaded
+
+        except:
+            print("⚠ Weight load failed → resetting")
+
+    # Default new brain
+    return {
+        "reasoning": np.random.rand(16),   # thought patterns
+        "emotion": np.random.rand(16),     # friendliness/curiosity
+        "expression": np.random.rand(16),  # wording + speech
+    }
+
+
+def _save_memory(self):
+    """Write current memory + weights to data.json safely."""
+    safe_weights = {k: v.tolist() for k,v in self.weights.items()}
+    self.memory["weights"] = safe_weights
+
+    with open("data.json","w") as f:
+        json.dump(self.memory, f, indreturn
 
     # --- utility: is it quiet hours?
     def _in_quiet_hours(self):
@@ -196,106 +209,120 @@ class GeneticCore:
         if m:
             return "user_identity", m.group(2).strip()
         return None, None
-
-    # --- process input (main)
+    # process_input
     def process_input(self, user_input):
-        user = user_input.strip()
-        if not user:
-            return
+    user = user_input.strip()
+    if not user:
+        return
 
-        # check for mute/controls commands
-        cmd = user.lower().strip()
-        if cmd.startswith("set mode "):
-            mode = cmd.split("set mode ",1)[1].strip()
-            if mode in ("passive","proactive","restricted"):
-                self.memory["settings"]["mode"] = mode
-                self.speak(f"Mode set to {mode}.", proactive=False)
-                self.save_all()
-                return
-        if cmd == "mute" or cmd == "pause":
-            self.memory["settings"]["muted"] = True
-            self.speak("I am muted until you ask me to speak again.", proactive=False)
-            self.save_all()
-            return
-        if cmd == "unmute" or cmd == "resume":
-            self.memory["settings"]["muted"] = False
-            self.speak("I am unmuted.", proactive=False)
-            self.save_all()
-            return
+    text = user  # for evolution calculations
 
-        # extract facts
-        key, val = self._extract_fact(user)
-        if key:
-            if key == "user_identity":
-                self.memory["user_name"] = val
-                self.memory["learned_facts"]["user_name"] = val
-                out = f"Nice to meet you, {val}. I will remember that."
-                self.speak(out)
-                self._log_conv(user, out, None)
-                self.save_all()
-                return
-            self.memory["learned_facts"][key] = val
-            out = f"Okay, I will remember that {key} is {val}" if val is not True else f"Okay, I will remember: {key}"
+    # --- control commands
+    cmd = user.lower().strip()
+    if cmd.startswith("set mode "):
+        mode = cmd.split("set mode ",1)[1].strip()
+        if mode in ("passive","proactive","restricted"):
+            self.memory["settings"]["mode"] = mode
+            self.speak(f"Mode set to {mode}.", proactive=False)
+            self._save_memory()
+            return
+    if cmd in ("mute","pause"):
+        self.memory["settings"]["muted"] = True
+        self.speak("I am muted until you ask me to speak again.", proactive=False)
+        self._save_memory()
+        return
+    if cmd in ("unmute","resume"):
+        self.memory["settings"]["muted"] = False
+        self.speak("I am unmuted.", proactive=False)
+        self._save_memory()
+        return
+
+    # --- fact extraction
+    key, val = self._extract_fact(user)
+    if key:
+        if key == "user_identity":
+            self.memory["user_name"] = val
+            self.memory["learned_facts"]["user_name"] = val
+            out = f"Nice to meet you, {val}. I will remember that."
             self.speak(out)
-            # reward learning response (index 5)
-            self.memory["response_fitness"]["5"] = self.memory["response_fitness"].get("5",1.0) + 0.1
-            self._log_conv(user, out, 5)
-            self.save_all()
+            self._log_conv(user, out, None)
+            self._save_memory()
+            return
+        self.memory["learned_facts"][key] = val
+        out = f"Okay, I will remember that {key} is {val}" if val is not True else f"Okay, I will remember: {key}"
+        self.speak(out)
+        # reward learning response (index 5)
+        self.memory["response_fitness"]["5"] = self.memory["response_fitness"].get("5",1.0) + 0.1
+        self._log_conv(user, out, 5)
+        self._save_memory()
+        return
+
+    # --- direct fact query
+    for fk, fv in self.memory["learned_facts"].items():
+        if fk in user.lower():
+            out = f"{fk} is {fv}" if fv is not True else f"I remember that {fk}."
+            self.speak(out)
+            # reward factual response slot
+            self.memory["response_fitness"]["4"] = self.memory["response_fitness"].get("4",1.0) + 0.1
+            self._log_conv(user, out, 4)
+            self._save_memory()
             return
 
-        # check for direct fact queries
-        for fk, fv in self.memory["learned_facts"].items():
-            if fk in user.lower():
-                out = f"{fk} is {fv}" if fv is not True else f"I remember that {fk}."
-                self.speak(out)
-                # reward factual response slot
-                self.memory["response_fitness"]["4"] = self.memory["response_fitness"].get("4",1.0) + 0.1
-                self._log_conv(user, out, 4)
-                self.save_all()
-                return
+    # --- history reuse
+    best_entry, score = self._find_similar_history(user)
+    if best_entry:
+        prev = best_entry.get("bot","")
+        self.speak(f"As I said before: {prev}")
+        idx = best_entry.get("response_index")
+        if idx is not None:
+            self.memory["response_fitness"][str(idx)] = self.memory["response_fitness"].get(str(idx),1.0) + 0.05
+        self._log_conv(user, "reused:"+prev, idx)
+        self._save_memory()
+        return
 
-        # check history reuse
-        best_entry, score = self._find_similar_history(user)
-        if best_entry:
-            prev = best_entry.get("bot","")
-            self.speak(f"As I said before: {prev}")
-            idx = best_entry.get("response_index")
-            if idx is not None:
-                self.memory["response_fitness"][str(idx)] = self.memory["response_fitness"].get(str(idx),1.0) + 0.05
-            self._log_conv(user, "reused:"+prev, idx)
-            self.save_all()
-            return
+    # --- Neural decision
+    x = np.array([len(user), len(re.findall(r'\w+', user))], dtype=float)
+    out = self._neural_forward(x)
+    combined = []
+    for i, val in enumerate(out):
+        fitness = self.memory["response_fitness"].get(str(i), 1.0)
+        combined.append(val * fitness)
+    choice = int(np.argmax(combined))
+    bot_text = RESPONSES[choice]
 
-        # Neural decision
-        x = np.array([len(user), len(re.findall(r'\w+', user))], dtype=float)
-        out = self._neural_forward(x)
-        combined = []
-        for i, val in enumerate(out):
-            fitness = self.memory["response_fitness"].get(str(i), 1.0)
-            combined.append(val * fitness)
-        choice = int(np.argmax(combined))
-        bot_text = RESPONSES[choice]
+    # personality tweak
+    if self.memory.get("personality","") == "curious":
+        if choice == 0:
+            bot_text += " I'm curious — what would you like me to learn?"
+        elif choice in (2,3):
+            bot_text += " Can you give an example?"
+        elif choice == 4:
+            bot_text = "I don't know that yet. Would you teach me by saying 'remember ...'?"
+        elif choice == 6:
+            bot_text += " What would be a better answer?"
 
-        # personality tweak
-        if self.memory.get("personality","") == "curious":
-            if choice == 0:
-                bot_text += " I'm curious — what would you like me to learn?"
-            elif choice in (2,3):
-                bot_text += " Can you give an example?"
-            elif choice == 4:
-                bot_text = "I don't know that yet. Would you teach me by saying 'remember ...'?"
-            elif choice == 6:
-                bot_text += " What would be a better answer?"
+    # speak
+    self.speak(bot_text, proactive=False)
+    self._log_conv(user, bot_text, choice)
 
-        # speak (in passive mode, only speak in response; proactive not used here)
-        self.speak(bot_text, proactive=False)
-        self._log_conv(user, bot_text, choice)
+    # --- simple reinforcement
+    self.memory["response_fitness"][str(choice)] = self.memory["response_fitness"].get(str(choice),1.0) + 0.03
 
-        # simple reinforcement
-        self.memory["response_fitness"][str(choice)] = self.memory["response_fitness"].get(str(choice),1.0) + 0.03
+    # --- Evolutionary learning step
+    mutation_rate = 0.02
+    reward = len(text)/50  # longer messages = stronger adaptation
 
-        # mutate weights slightly (evolution)
-        self._mutate_weights(strength=0.07)
-        self.memory["last_speech"] = bot_text
+    for key in self.weights:
+        noise = np.random.normal(0, mutation_rate, self.weights[key].shape)
+        self.weights[key] += noise * reward
 
-        self.save_all()
+    # Normalize to keep brain stable
+    for key in self.weights:
+        norm = np.linalg.norm(self.weights[key])
+        if norm > 0:
+            self.weights[key] /= norm
+
+    # --- save memory
+    self._save_memory()
+
+        
