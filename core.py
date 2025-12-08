@@ -1,7 +1,10 @@
 # ========================= core.py ================================
-
-import os, json, time, re, random
+import os, json, time, re
 import numpy as np
+from gtts import gTTS
+
+MEMORY_FILE = "memory.json"
+CONV_FILE = "conversations.json"
 
 DEFAULT_MEMORY = {
     "name": "Genetic",
@@ -9,18 +12,15 @@ DEFAULT_MEMORY = {
     "user_name": "",
     "learned_facts": {},
     "response_fitness": {},
-    "weights": {},            
+    "weights": {},
     "meta": {"created_at": None},
     "settings": {
-        "mode": "passive",   
-        "quiet_hours": [22,7],
+        "mode": "passive",      # passive / proactive / restricted
+        "quiet_hours": [22, 7],
         "rate_limit_per_hour": 6,
         "muted": False
     }
 }
-
-MEMORY_FILE = "memory.json"
-CONV_FILE = "conversations.json"
 
 RESPONSES = [
     "Hello! How can I help you today?",
@@ -32,20 +32,19 @@ RESPONSES = [
     "I might be mistaken — please correct me if I'm wrong."
 ]
 
-# =================================================================
 class GeneticCore:
-    def __init__(self, voice):
+    def __init__(self, voice=None):
         self.voice = voice
         self.memory = self._load_memory()
         self._ensure_files()
         self.weights = self._load_weights()
         self.response_count = []
 
-        # init fitness for every response
+        # init response fitness
         for i in range(len(RESPONSES)):
             self.memory["response_fitness"].setdefault(str(i), 1.0)
 
-# =================================================================
+    # ------------------ Files & Memory ------------------
     def _ensure_files(self):
         if not os.path.exists(CONV_FILE):
             with open(CONV_FILE,"w") as f: json.dump([],f)
@@ -53,18 +52,21 @@ class GeneticCore:
     def _load_memory(self):
         if os.path.exists(MEMORY_FILE):
             return json.load(open(MEMORY_FILE))
-        
         m = DEFAULT_MEMORY.copy()
         m["meta"]["created_at"] = time.time()
         return m
 
-# ========================= WEIGHTS ==============================
+    def _save_memory(self):
+        self.memory["weights"] = {k:v.tolist() for k,v in self.weights.items()}
+        json.dump(self.memory, open(MEMORY_FILE,"w"), indent=2)
+
+    # ------------------ Neural Weights ------------------
     def _init_weights(self):
         return {
-            "W1": np.random.randn(2,12).tolist(),
-            "b1": np.random.randn(12).tolist(),
-            "W2": np.random.randn(12,len(RESPONSES)).tolist(),
-            "b2": np.random.randn(len(RESPONSES)).tolist()
+            "W1": np.random.randn(2,12),
+            "b1": np.random.randn(12),
+            "W2": np.random.randn(12,len(RESPONSES)),
+            "b2": np.random.randn(len(RESPONSES))
         }
 
     def _load_weights(self):
@@ -74,22 +76,24 @@ class GeneticCore:
                 loaded = {k: np.array(v) for k,v in self.memory["weights"].items()}
         except:
             loaded=None
-
         if loaded and all(isinstance(v,np.ndarray) for v in loaded.values()):
             return loaded
-
+        # else initialize new
         brain = self._init_weights()
         self.memory["weights"] = brain
         self._save_memory()
-        return {k:np.array(v) for k,v in brain.items()}
+        return brain
 
-    def _save_memory(self):
-        self.memory["weights"] = {k:v.tolist() for k,v in self.weights.items()}
-        json.dump(self.memory,open(MEMORY_FILE,"w"),indent=2)
+    # ------------------ Neural forward ------------------
+    def _neural_forward(self,x):
+        W1,b1=self.weights["W1"],self.weights["b1"]
+        W2,b2=self.weights["W2"],self.weights["b2"]
+        h=np.tanh(x@W1+b1)
+        return h@W2+b2
 
-# ========================= BEHAVIOUR CONTROL ====================
+    # ------------------ Speak / proactive ------------------
     def _in_quiet_hours(self):
-        start,end = self.memory["settings"]["quiet_hours"]
+        start,end=self.memory["settings"]["quiet_hours"]
         hour=time.localtime().tm_hour
         return (start<=hour<end) if start<end else (hour>=start or hour<end)
 
@@ -101,21 +105,22 @@ class GeneticCore:
         self.response_count=[t for t in self.response_count if t>cutoff]
         return len(self.response_count) < self.memory["settings"]["rate_limit_per_hour"]
 
-    def _record_proactive(self):
-        self.response_count.append(time.time())
-
     def speak(self,text,proactive=False):
         if self.memory["settings"]["muted"]: return
         if proactive and not self._can_proactively_speak(): return
-        if proactive: self._record_proactive()
-        try: self.voice.speak(text)
-        except: print("SPEAK:",text)
+        try:
+            if self.voice: self.voice.speak(text)
+            else: print("SPEAK:", text)
+        except: print("SPEAK:", text)
 
-# ======================= HISTORY & LEARNING ======================
-    def _log_conv(self,u,b,i):
-        conv=json.load(open(CONV_FILE))
-        conv.append({"time":time.time(),"user":u,"bot":b,"response_index":i})
-        json.dump(conv,open(CONV_FILE,"w"),indent=1)
+    # ------------------ Conversation logging ------------------
+    def _log_conv(self,user_text,bot_text,response_index):
+        try:
+            conv=json.load(open(CONV_FILE))
+        except:
+            conv=[]
+        conv.append({"time":time.time(),"user":user_text,"bot":bot_text,"response_index":response_index})
+        json.dump(conv, open(CONV_FILE,"w"), indent=1)
 
     def _similarity(self,a,b):
         A=set(re.findall(r'\w+',a.lower()))
@@ -128,66 +133,29 @@ class GeneticCore:
         except: return None,0.0
         best=None; score=0
         for e in conv:
-            s=self._similarity(q,e["user"])
-            if s>score: score=s; best=e
+            s=self._similarity(q,e.get("user",""))
+            if s>score: best=e; score=s
         return (best,score) if score>=threshold else (None,0)
 
-# ================= FACT EXTRACTION ====================
+    # ------------------ Fact extraction ------------------
     def _extract_fact(self,text):
         tl=text.lower().strip()
-        if m:=re.match(r'.*remember (.+):(.+)',tl): return m[1].strip(),m[2].strip()
-        if m:=re.match(r'.*remember (.+)',tl): return m[1].strip(),True
-        if m:=re.match(r'.*my (.+) is (.+)',tl): return m[1].strip(),m[2].strip()
-        if m:=re.match(r'.*(i am|i\'m) (.+)',tl): return "user_identity",m[2].strip()
+        if m:=re.match(r'.*remember (.+):(.+)',tl):
+            return m[1].strip(), m[2].strip()
+        if m:=re.match(r'.*remember (.+)',tl):
+            return m[1].strip(), True
+        if m:=re.match(r'.*my (.+) is (.+)',tl):
+            return m[1].strip(), m[2].strip()
+        if m:=re.match(r'.*(i am|i\'m) (.+)',tl):
+            return "user_identity", m[2].strip()
         return None,None
 
-# ======================== PROACTIVE SPEECH ========================
-    def proactive_speech(self):
-        """AI speaks proactively if conditions allow."""
-        if not self._can_proactively_speak(): return
-
-        sample_inputs = ["Hello!", "Tell me something.", "How are you?", "What should I learn?", "Any news?"]
-        user = random.choice(sample_inputs)
-
-        x=np.array([len(user), len(re.findall(r'\w+',user))],dtype=float)
-        logits=self._neural_forward(x)
-        combined=[logits[i]*self.memory["response_fitness"].get(str(i),1) for i in range(len(RESPONSES))]
-        choice=int(np.argmax(combined))
-        bot_text=RESPONSES[choice]
-
-        if self.memory.get("personality","")=="curious":
-            if choice==0: bot_text+=" I'm curious — what would you like me to learn?"
-            elif choice in (2,3): bot_text+=" Can you give an example?"
-            elif choice==4: bot_text="I don't know that yet. Would you teach me by saying 'remember ...'?"
-            elif choice==6: bot_text+=" What would be a better answer?"
-
-        self.speak(bot_text, proactive=True)
-        self._log_conv(user, bot_text, choice)
-        self.memory["response_fitness"][str(choice)]+=0.03
-
-# ======================== PROCESS INPUT ==========================
+    # ------------------ Process input ------------------
     def process_input(self,user_input):
-        user=user_input.strip()
+        user = user_input.strip()
         if not user: return
 
-        # ----------------- Control Commands -----------------
-        cmd=user.lower()
-        if cmd.startswith("set mode "):
-            m=cmd.split("set mode ",1)[1].strip()
-            if m in("passive","proactive","restricted"):
-                self.memory["settings"]["mode"]=m
-                self.speak(f"Mode set to {m}")
-                self._save_memory()
-        elif cmd in("mute","pause"):
-            self.memory["settings"]["muted"]=True
-            self.speak("Voice disabled.")
-            self._save_memory()
-        elif cmd in("unmute","resume"):
-            self.memory["settings"]["muted"]=False
-            self.speak("Voice enabled.")
-            self._save_memory()
-
-        # ----------------- Fact Learning -----------------
+        # ----- fact learning -----
         key,val=self._extract_fact(user)
         if key:
             if key=="user_identity":
@@ -201,7 +169,7 @@ class GeneticCore:
             self._save_memory()
             return
 
-        # ----------------- Fact Recall -----------------
+        # ----- fact recall -----
         for fk,fv in self.memory["learned_facts"].items():
             if fk.lower() in user.lower():
                 out=f"{fk} is {fv}" if fv!=True else f"I remember {fk}."
@@ -210,7 +178,7 @@ class GeneticCore:
                 self._save_memory()
                 return
 
-        # ----------------- History Reuse -----------------
+        # ----- history reuse -----
         best,score=self._find_similar_history(user)
         if best:
             prev=best["bot"]
@@ -219,29 +187,28 @@ class GeneticCore:
             self._save_memory()
             return
 
-        # ----------------- Neural Output -----------------
+        # ----- neural response -----
         x=np.array([len(user),len(re.findall(r'\w+',user))],float)
         logits=self._neural_forward(x)
         combined=[logits[i]*self.memory["response_fitness"].get(str(i),1) for i in range(len(RESPONSES))]
         choice=int(np.argmax(combined))
         bot=RESPONSES[choice]
 
-        # speak and log
+        # personality tweak
+        if self.memory.get("personality")=="curious":
+            if choice==0: bot+=" I'm curious — what would you like me to learn?"
+            elif choice in (2,3): bot+=" Can you give an example?"
+            elif choice==4: bot="I don't know that yet. Would you teach me by saying 'remember ...'?"
+            elif choice==6: bot+=" What would be a better answer?"
+
         self.speak(bot)
         self._log_conv(user,bot,choice)
         self.memory["response_fitness"][str(choice)]+=0.03
 
-        # mutation
+        # ----- mutation learning -----
         reward=len(user)/50
         for k in self.weights:
             self.weights[k]+=np.random.normal(0,0.02,self.weights[k].shape)*reward
             self.weights[k]/=np.linalg.norm(self.weights[k]) or 1
 
         self._save_memory()
-
-# ======================== NEURAL FORWARD =========================
-    def _neural_forward(self,x):
-        W1,b1=self.weights["W1"],self.weights["b1"]
-        W2,b2=self.weights["W2"],self.weights["b2"]
-        h=np.tanh(x@W1+b1)
-        return h@W2+b2
